@@ -15,10 +15,21 @@ Source_Loc :: struct {
     offset: int
 }
 
+Tag_Info_Decl_Kind :: enum u8 {
+    Value,
+    Constant,
+    Struct,
+    Union,
+    Enum,
+    Procedure,
+    Foreign_Block,
+    Foreign_Import
+}
+
 Tag_Info :: struct {
     value: string,
     decl: string,
-    decl_kind: string,
+    decl_kind: Tag_Info_Decl_Kind,
     tag_loc: Source_Loc,
     target_loc: Source_Loc,
     target_end_loc: Source_Loc
@@ -36,7 +47,7 @@ loc_from_pos :: proc(pos: tokenizer.Pos) -> Source_Loc {
 extract_tags :: proc(
     attrs: []^ast.Attribute,
     decl: string,
-    decl_kind: string,
+    decl_kind: Tag_Info_Decl_Kind,
     target_pos: tokenizer.Pos,
     target_end: tokenizer.Pos,
     results: ^[dynamic]Tag_Info
@@ -117,10 +128,10 @@ visit_node :: proc(
                 ident, ok := name_expr.derived_expr.(^ast.Ident)
                 if !ok do continue
 
-                kind := "value"
+                kind := Tag_Info_Decl_Kind.Value
 
                 if !n.is_mutable {
-                    kind = "constant"
+                    kind = .Constant
                 }
 
                 if len(n.values) > 0 {
@@ -129,13 +140,13 @@ visit_node :: proc(
                     if value != nil {
                         #partial switch _ in value.derived_expr {
                             case ^ast.Struct_Type:
-                                kind = "struct"
+                                kind = .Struct
                             case ^ast.Union_Type:
-                                kind = "union"
+                                kind = .Union
                             case ^ast.Enum_Type:
-                                kind = "enum"
+                                kind = .Enum
                             case ^ast.Proc_Lit:
-                                kind = "procedure"
+                                kind = .Procedure
                             case:
                         }
                     }
@@ -145,7 +156,7 @@ visit_node :: proc(
             }
 
         case ^ast.Foreign_Block_Decl:
-            extract_tags(n.attributes[:], "<foreign block>", "foreign_block", n.pos, n.end, &scanner.results)
+            extract_tags(n.attributes[:], "<foreign block>", .Foreign_Block, n.pos, n.end, &scanner.results)
 
         case ^ast.Foreign_Import_Decl:
             name := "<foreign import>"
@@ -158,7 +169,7 @@ visit_node :: proc(
                 target_end = n.name.end
             }
 
-            extract_tags(n.attributes[:], name, "foreign_import", target_pos, target_end, &scanner.results)
+            extract_tags(n.attributes[:], name, .Foreign_Import, target_pos, target_end, &scanner.results)
 
         case:
     }
